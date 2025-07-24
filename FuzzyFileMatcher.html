@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-File Data Matcher</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #1e1e1e;
+            color: #f0f0f0;
+            margin: 20px;
+            line-height: 1.6; /* Improved readability */
+        }
+        .light-theme {
+            background-color: #f9f5f3; /* Soft off-white */
+            color: #555; /* Medium gray for text */
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .file-upload-section, .column-selection-section, .output-section, .download-section, .instructions-section {
+            border: 1px solid #444;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #2a2a2a; /* Slightly darker for dark theme sections */
+        }
+        .light-theme .file-upload-section, .light-theme .column-selection-section, .light-theme .output-section, .light-theme .download-section, .light-theme .instructions-section {
+            border-color: #ddd; /* Light gray border */
+            background-color: #fff; /* White background for light theme sections */
+        }
+        .file-upload-inputs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center; /* Align label and input vertically */
+        }
+        .column-selection-boxes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .column-selection-box label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .column-checkboxes {
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #666;
+            padding: 10px;
+            border-radius: 3px;
+            background-color: #333;
+        }
+        .light-theme .column-checkboxes {
+            border-color: #eee; /* Very light gray border */
+            background-color: #f4f4f4; /* Light gray background */
+        }
+        .column-checkboxes label {
+            font-weight: normal;
+        }
+        #output-container {
+            border: 1px solid #555;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #222;
+            position: relative;
+        }
+        .light-theme #output-container {
+            border-color: #ccc; /* Light gray border */
+            background-color: #f9f9f9; /* Very light gray background */
+        }
+        #output-table-container-top, #output-table-container-bottom {
+            overflow: auto; /* Changed to auto to enable both scroll directions */
+            max-height: 400px; /* Increased for better viewability */
+            margin-bottom: 5px;
+            position: relative; /* Needed for sticky positioning of children */
+        }
+        #output-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #output-table th, #output-table td {
+            border: 1px solid #666;
+            padding: 8px;
+            text-align: left;
+        }
+        .light-theme #output-table th, .light-theme #output-table td {
+            border-color: #e0e0e0; /* Lighter gray table borders */
+        }
+        #output-table thead th {
+            position: sticky;
+            top: 0;
+            background-color: #333; /* Or inherit if you prefer */
+            z-index: 1;
+        }
+        .light-theme #output-table thead th {
+            background-color: #e9ecef; /* Light gray header background */
+            color: #555; /* Darker text for header */
+        }
+        #output-table tbody td:first-child {
+            position: sticky;
+            left: 0;
+            background-color: #222; /* Or inherit */
+            z-index: 2; /* Higher than header to be on top if needed */
+        }
+        .light-theme #output-table tbody td:first-child {
+            background-color: #f9f9f9; /* Very light gray row number background */
+            color: #555;
+        }
+         .fuzzy-match-cell {
+             font-style: italic;
+             color: #bbb; /* Muted color for fuzzy details */
+         }
+         .light-theme .fuzzy-match-cell {
+             color: #777; /* Muted color for fuzzy details in light theme */
+         }
+        .file1-cell { background-color: #375a7f; color: #fff; } /* Slightly better contrast */
+        .file2-cell { background-color: #8fbc8f; color: #000; } /* Slightly better contrast */
+        .file3-cell { background-color: #f0e68c; color: #000; } /* Slightly better contrast */
+        .file4-cell { background-color: #e9967a; color: #000; } /* Slightly better contrast */
+        .light-theme .file1-cell { background-color: #e0f2f7; color: #333; } /* Very light blue */
+        .light-theme .file2-cell { background-color: #e8f5e9; color: #333; } /* Very light green */
+        .light-theme .file3-cell { background-color: #fffde7; color: #333; } /* Very light yellow */
+        .light-theme .file4-cell { background-color: #ffebee; color: #333; } /* Very light red/pink */
+        .controls {
+            margin-bottom: 10px;
+        }
+        .theme-toggle {
+            margin-bottom: 10px;
+        }
+        .download-options label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .download-options input[type="checkbox"] {
+            margin-right: 5px;
+        }
+        button {
+            padding: 10px 20px; /* Slightly larger buttons */
+            border: none;
+            border-radius: 5px; /* Slightly more rounded */
+            cursor: pointer;
+            background-color: #555;
+            color: #f0f0f0;
+            margin-top: 5px; /* Add some space between buttons */
+            margin-right: 10px; /* Space between buttons */
+        }
+        .light-theme button {
+            background-color: #e0e0e0; /* Light gray button */
+            color: #333; /* Darker text for button */
+        }
+        button:hover {
+            background-color: #777;
+        }
+        .light-theme button:hover {
+            background-color: #d0d0d0; /* Slightly darker light gray on hover */
+        }
+        #loading-indicator {
+            display: none;
+            margin-top: 10px;
+            color: #aaa;
+        }
+        .light-theme #loading-indicator {
+            color: #777; /* Medium gray for loading text */
+        }
+        .instructions-section ol {
+            padding-left: 20px;
+        }
+        .instructions-section li {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="theme-toggle">
+            <button id="theme-button">Switch to Light Theme</button>
+        </div>
+
+        <div class="instructions-section" id="instructions">
+            <h2>Usage Instructions</h2>
+            <p>Multi-File Data Matcher is a straightforward web application that helps you find common rows between multiple CSV and Excel files. Upload your files, specify the columns you want to compare, and quickly see the matching records. The application features a clean and calming light theme for comfortable data processing and offers flexible download options.</p>
+            <ol>
+                <li><strong>File Upload:</strong> Click the "Choose File" buttons to upload up to 4 CSV or Excel files. Ensure each file has a descriptive name.</li>
+                <li><strong>Column Selection:</strong> Once files are uploaded, the column names from each file will appear. Check the boxes next to the columns you want to use for matching rows. You can select up to 4 columns per file.</li>
+                <li><strong>Name Normalization (Optional):</strong> Check the "Normalize Names" option if you want to match names regardless of word order (e.g., "Joe Bloggs" will match "Bloggs Joe").</li>
+                <li><strong>Match Rows:</strong> Use the buttons below to find matching or non-matching rows based on your selected columns.
+                    <ul>
+                        <li>"Match Rows (All Files)": Find rows with common data in the selected columns across *all* uploaded files.</li>
+                        <li>"Find Rows with At Least One Match": Find rows from the first file that have a match in the selected columns in *any* of the other uploaded files.</li>
+                        <li>"Show Non-Matching Rows (From File 1)": Display rows from the first file that do *not* have a match in the selected columns in *any* of the other uploaded files.</li>
+                         <li>"Show Possible Matches (Fuzzy)": Find rows across different files where the selected matching columns have similar (possibly misspelled) data.</li>
+                    </ul>
+                </li>
+                <li><strong>View Output:</strong> The matching/non-matching records will be displayed in the box below. Use the scroll bars above and below the table to view all rows and columns. Each file's data will have a distinct background color (for exact/any matches). Row numbers and headers will remain visible while scrolling. The bottom output will start at the end of the matched list. Fuzzy matches are displayed as a list of pairs.</li>
+                <li><strong>Download Output:</strong> Optionally, use the "Select All" or "Unselect All" options to choose which columns to include in the downloaded file and click the "Download Output" button. The output will be downloaded as a CSV file. If fuzzy matches are displayed, a simplified CSV will be downloaded.</li>
+            </ol>
+        </div>
+
+        <div class="file-upload-section" aria-describedby="instructions-file-upload">
+            <h2>Upload Files</h2>
+            <div class="file-upload-inputs">
+                <label for="file1">File 1:</label>
+                <input type="file" id="file1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+            </div>
+            <div class="file-upload-inputs">
+                <label for="file2">File 2:</label>
+                <input type="file" id="file2" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+            </div>
+            <div class="file-upload-inputs">
+                <label for="file3">File 3:</label>
+                <input type="file" id="file3" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+            </div>
+            <div class="file-upload-inputs">
+                <label for="file4">File 4:</label>
+                <input type="file" id="file4" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+            </div>
+            <p id="instructions-file-upload" style="font-size: small; color: #888;">Select up to 4 files in CSV or Excel format.</p>
+        </div>
+
+        <div class="column-selection-section" aria-labelledby="matching-columns-legend" aria-describedby="instructions-column-selection">
+            <h2 id="matching-columns-legend">Select Matching Columns</h2>
+            <form>
+                <div class="column-selection-boxes" id="column-selection-boxes" role="group" aria-labelledby="matching-columns-legend">
+                    </div>
+                <button type="button" id="show-fuzzy-matches-button">Show Possible Matches (Fuzzy)</button>
+                <p id="loading-indicator">Processing rows...</p>
+                <p id="instructions-column-selection" style="font-size: small; color: #888;">
+                    Choose up to 4 columns from each uploaded file to match rows.
+                    <br>
+                    <span aria-hidden="true">Tip: Use Tab/Shift+Tab to navigate checkboxes, and Space to toggle.</span>
+                </p>
+            </form>
+        </div>
+
+        <div class="output-section" aria-live="polite" aria-describedby="instructions-output">
+            <h2>Matching Records</h2>
+            <div id="output-container">
+                <div id="output-table-container-top">
+                    </div>
+                <div id="output-table-container-bottom">
+                    <table id="output-table">
+                        <thead>
+                            <tr><th>#</th></tr>
+                        </thead>
+                        <tbody>
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Second output table for reverse scroll -->
+            <div id="output-container-bottom" style="margin-top:24px;">
+                <h3 style="margin-bottom:4px;">Matching Records (Bottom View)</h3>
+                <div id="output-table-container-bottom2" style="overflow:auto; max-height:400px;">
+                    <table id="output-table-bottom">
+                        <thead>
+                            <tr><th>#</th></tr>
+                        </thead>
+                        <tbody>
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+            <p id="instructions-output" style="font-size: small; color: #888;">
+                The matching/non-matching records are displayed below. Use the scrollbars to view all data.
+            </p>
+        </div>
+
+        <div class="download-section" aria-describedby="instructions-download">
+            <h2>Download Output</h2>
+            <div class="download-options" id="download-options">
+                <label>Select columns to include in download:</label><br>
+                <input type="checkbox" id="select-all-columns" onchange="selectAllDownloadColumns(this.checked)">
+                <label for="select-all-columns">Select All</label><br>
+                <input type="checkbox" id="unselect-all-columns" onchange="unselectAllDownloadColumns(this.checked)">
+                <label for="unselect-all-columns">Unselect All</label><br>
+                </div>
+            <button onclick="downloadOutput()">Download Output</button>
+            <p id="instructions-download" style="font-size: small; color: #888;">Choose columns to include in the downloaded CSV file.</p>
+        </div>
+    </div>
+
+    <script>
+        const fileInputs = [
+            document.getElementById('file1'),
+            document.getElementById('file2'),
+            document.getElementById('file3'),
+            document.getElementById('file4')
+        ];
+        const columnSelectionBoxes = document.getElementById('column-selection-boxes');
+        const outputTableContainerTop = document.getElementById('output-table-container-top');
+        const outputTableContainerBottom = document.getElementById('output-table-container-bottom');
+        const outputTableBody = document.querySelector('#output-table tbody');
+        const outputTableBottomBody = document.querySelector('#output-table-bottom tbody');
+        const outputTableBottom = document.getElementById('output-table-bottom');
+        const outputTableContainerBottom2 = document.getElementById('output-table-container-bottom2');
+        const downloadOptionsDiv = document.getElementById('download-options');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const themeButton = document.getElementById('theme-button');
+        const body = document.body;
+        const showFuzzyMatchesButton = document.getElementById('show-fuzzy-matches-button');
+
+        let filesData = [];
+        let allColumnHeaders = [];
+        let currentTheme = 'dark';
+        let currentOutputData = []; // Store the data currently displayed in the table
+        let currentOutputHeaders = []; // Store headers for current output
+        let currentOutputIsFuzzy = false; // Track if the current output is fuzzy matches
+        let fuzzyMatchesDataForDownload = []; // Store fuzzy matches in a structured way for download
+
+        themeButton.addEventListener('click', () => {
+            body.classList.toggle('light-theme');
+            currentTheme = body.classList.contains('light-theme') ? 'light' : 'dark';
+            themeButton.textContent = currentTheme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme';
+        });
+
+        fileInputs.forEach((input, index) => {
+            input.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    readFile(file, index + 1);
+                } else {
+                    filesData[index] = null;
+                    updateColumnSelection();
+                }
+            });
+        });
+
+        function readFile(file, fileNumber) {
+            // Ensure SheetJS is loaded before parsing Excel files
+            const isExcel = file.name.match(/\.(xlsx|xls)$/i);
+            if (isExcel) {
+                // Wait for XLSX to be loaded before proceeding
+                function handleExcelFile() {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const workbook = XLSX.read(e.target.result, { type: 'array' });
+                            const sheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[sheetName];
+                            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
+                            if (json.length > 0) {
+                                // Remove empty trailing columns in header
+                                let headers = json[0].map(h => (h !== undefined ? String(h).trim() : ""));
+
+                                // Remove trailing empty headers
+                                while (headers.length > 0 && headers[headers.length - 1] === "") {
+                                    headers.pop();
+                                }
+
+                                // Remove trailing empty cells in each row to match headers length
+                                const dataRows = json.slice(1).map(row => {
+                                    let trimmed = Array.from(row);
+                                    while (trimmed.length > headers.length) trimmed.pop();
+                                    while (trimmed.length < headers.length) trimmed.push("");
+                                    return headers.map((_, idx) => (trimmed[idx] !== undefined ? String(trimmed[idx]).trim() : ""));
+                                });
+
+                                filesData[fileNumber - 1] = { name: file.name, headers: headers, data: dataRows };
+                            } else {
+                                filesData[fileNumber - 1] = null;
+                            }
+                            updateColumnSelection();
+                        } catch (err) {
+                            alert(`Error parsing Excel file: ${file.name}`);
+                            filesData[fileNumber - 1] = null;
+                            updateColumnSelection();
+                        }
+                    };
+                    reader.onerror = () => {
+                        alert(`Error reading file ${file.name}`);
+                        filesData[fileNumber - 1] = null;
+                        updateColumnSelection();
+                    };
+                    reader.readAsArrayBuffer(file);
+                }
+                if (typeof XLSX === "undefined") {
+                    // SheetJS not loaded yet, load and then process
+                    const script = document.createElement('script');
+                    script.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+                    script.onload = handleExcelFile;
+                    document.head.appendChild(script);
+                } else {
+                    handleExcelFile();
+                }
+            } else {
+                // CSV fallback
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const contents = event.target.result;
+                    const lines = contents.split('\n').map(line => line.trim());
+                    if (lines.length > 0) {
+                        const headers = lines[0].split(',').map(header => header.trim());
+                        const data = lines.slice(1).map(line => line.split(',').map(cell => cell.trim()));
+                        filesData[fileNumber - 1] = { name: file.name, headers: headers, data: data };
+                    } else {
+                        filesData[fileNumber - 1] = null;
+                    }
+                    updateColumnSelection();
+                };
+                reader.onerror = () => {
+                    alert(`Error reading file ${file.name}`);
+                    filesData[fileNumber - 1] = null;
+                    updateColumnSelection();
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        function updateColumnSelection() {
+            columnSelectionBoxes.innerHTML = '';
+            allColumnHeaders = [];
+            filesData.forEach((fileData, index) => {
+                if (fileData && fileData.headers) {
+                    const fileNumber = index + 1;
+                    const fieldset = document.createElement('fieldset');
+                    fieldset.setAttribute('aria-labelledby', `file${fileNumber}-legend`);
+                    fieldset.style.border = "none";
+                    fieldset.style.padding = "0";
+                    const legend = document.createElement('legend');
+                    legend.id = `file${fileNumber}-legend`;
+                    legend.textContent = `File ${fileNumber}: ${fileData.name}`;
+                    fieldset.appendChild(legend);
+
+                    const checkboxesDiv = document.createElement('div');
+                    checkboxesDiv.className = "column-checkboxes";
+                    checkboxesDiv.id = `file${fileNumber}-columns`;
+
+                    fileData.headers.forEach((header, hIdx) => {
+                        const checkboxId = `file${fileNumber}-col${hIdx}`;
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.id = checkboxId;
+                        checkbox.value = header;
+                        checkbox.setAttribute('aria-labelledby', `${checkboxId}-label`);
+                        const label = document.createElement('label');
+                        label.setAttribute('for', checkboxId);
+                        label.id = `${checkboxId}-label`;
+                        label.textContent = header;
+                        checkboxesDiv.appendChild(checkbox);
+                        checkboxesDiv.appendChild(label);
+                        checkboxesDiv.appendChild(document.createElement('br'));
+                        if (!allColumnHeaders.includes(header)) {
+                            allColumnHeaders.push(header);
+                        }
+                    });
+                    fieldset.appendChild(checkboxesDiv);
+                    columnSelectionBoxes.appendChild(fieldset);
+                }
+            });
+            updateDownloadOptions();
+        }
+
+        function getSelectedColumns() {
+            const selectedColumns = [];
+            filesData.forEach((fileData, index) => {
+                if (fileData) {
+                    const fileNumber = index + 1;
+                    const selected = [];
+                    const checkboxes = document.querySelectorAll(`#file${fileNumber}-columns input[type="checkbox"]:checked`);
+                    checkboxes.forEach(checkbox => {
+                        selected.push(checkbox.value);
+                    });
+                    selectedColumns.push(selected);
+                } else {
+                    selectedColumns.push([]);
+                }
+            });
+            return selectedColumns;
+        }
+
+        // New: Name normalization function
+        function normalizeName(name) {
+            if (typeof name !== 'string' || name.trim() === '') {
+                return '';
+            }
+            return name.toLowerCase().split(/\s+/).sort().join(' ');
+        }
+
+        function getValueForComparison(value) {
+            return value;
+        }
+
+
+        function matchRows() {
+            if (!filesData.some(data => data !== null)) {
+                alert('Please upload at least one file.');
+                return;
+            }
+
+            const selectedColumns = getSelectedColumns();
+            if (selectedColumns.some(cols => cols.length > 4)) {
+                alert('You can select a maximum of 4 columns per file for matching.');
+                return;
+            }
+
+            loadingIndicator.style.display = 'block';
+            setTimeout(() => {
+                const matchedRows = findMatchingRows(filesData, selectedColumns);
+                displayMatchingRows(matchedRows);
+                currentOutputIsFuzzy = false; // Not fuzzy output
+                loadingIndicator.style.display = 'none';
+            }, 100); // Simulate processing time
+        }
+
+        function findMatchingRows(data, selectedColumns) {
+            if (data.every(file => file === null)) {
+                return [];
+            }
+
+            const validFilesData = data.filter(file => file !== null);
+            const validSelectedColumns = selectedColumns.filter((_, index) => data[index] !== null);
+
+            if (validFilesData.length <= 1) {
+                // If only one or zero files are uploaded, consider all rows as "matching" with themselves
+                if (validFilesData.length === 1) {
+                    return validFilesData[0].data.map((_, index) => {
+                        const record = {};
+                        validFilesData[0].headers.forEach((header, headerIndex) => {
+                            record[`File1 - ${header}`] = validFilesData[0].data[index][headerIndex];
+                        });
+                        return record;
+                    });
+                }
+                return [];
+            }
+
+            const matchedRecords = [];
+            const firstFileData = validFilesData[0];
+            const firstSelectedColumns = validSelectedColumns[0];
+
+            firstFileData.data.forEach((row, rowIndex) => {
+                const matchKey = firstSelectedColumns.map(col => getValueForComparison(row[firstFileData.headers.indexOf(col)])).join('|||');
+                let isMatchInAll = true;
+                const currentRowIndices = { 0: rowIndex };
+
+                for (let i = 1; i < validFilesData.length; i++) {
+                    const currentFileData = validFilesData[i];
+                    const currentSelectedColumns = validSelectedColumns[i];
+                    let foundMatchInCurrentFile = false;
+                    currentFileData.data.forEach((currentRow, currentRowIndex) => {
+                        const currentRowMatchKey = currentSelectedColumns.map(col => getValueForComparison(currentRow[currentFileData.headers.indexOf(col)])).join('|||');
+                        if (matchKey === currentRowMatchKey) {
+                            currentRowIndices[i] = currentRowIndex;
+                            foundMatchInCurrentFile = true;
+                            return; // Found a match in this file, move to the next file
+                        }
+                    });
+                    if (!foundMatchInCurrentFile) {
+                        isMatchInAll = false;
+                        return; // No match found in this file, no need to check further files for this first file row
+                    }
+                }
+
+                if (isMatchInAll) {
+                    const record = {};
+                    Object.keys(currentRowIndices).forEach(fileIndexStr => {
+                        const fileIndex = parseInt(fileIndexStr);
+                        const rowIndex = currentRowIndices[fileIndex];
+                        const fileData = validFilesData[fileIndex];
+                        fileData.headers.forEach((header, headerIndex) => {
+                            record[`File${fileIndex + 1} - ${header}`] = fileData.data[rowIndex][headerIndex];
+                        });
+                    });
+                    matchedRecords.push(record);
+                }
+            });
+
+            return matchedRecords;
+        }
+
+        function findAnyMatchingRows() {
+            if (!filesData.some(data => data !== null)) {
+                alert('Please upload at least one file.');
+                return;
+            }
+
+            const selectedColumns = getSelectedColumns();
+            if (selectedColumns.some(cols => cols.length > 4)) {
+                alert('You can select a maximum of 4 columns per file for matching.');
+                return;
+            }
+
+            loadingIndicator.style.display = 'block';
+            setTimeout(() => {
+                const matchedRows = findRowsWithAnyMatch(filesData, selectedColumns);
+                displayMatchingRows(matchedRows);
+                currentOutputIsFuzzy = false; // Not fuzzy output
+                loadingIndicator.style.display = 'none';
+            }, 100); // Simulate processing time
+        }
+
+        function findRowsWithAnyMatch(data, selectedColumns) {
+            if (data.every(file => file === null)) {
+                return [];
+            }
+
+            const validFilesData = data.filter(file => file !== null);
+            const validSelectedColumns = selectedColumns.filter((_, index) => data[index] !== null);
+
+            if (validFilesData.length <= 1) {
+                 if (validFilesData.length === 1) {
+                    // If only one file, all rows are "matches" with themselves in this context
+                    return validFilesData[0].data.map((_, index) => {
+                        const record = {};
+                        validFilesData[0].headers.forEach((header, headerIndex) => {
+                             record[`File1 - ${header}`] = validFilesData[0].data[index][headerIndex];
+                        });
+                        return record;
+                    });
+                }
+                return [];
+            }
+
+            const matchedRecords = [];
+             const processedFirstFileRows = new Set(); // To avoid processing the same first file row multiple times
+
+            const firstFileData = validFilesData[0];
+            const firstSelectedColumns = validSelectedColumns[0];
+
+             // Iterate through each row of the first file
+            firstFileData.data.forEach((row, rowIndex) => {
+                 if (processedFirstFileRows.has(rowIndex)) return; // Skip if already processed
+
+                const matchKey = firstSelectedColumns.map(col => getValueForComparison(row[firstFileData.headers.indexOf(col)])).join('|||');
+                let hasMatchInAnyOther = false;
+                 const currentRowIndices = { 0: rowIndex }; // Store indices for the first file row
+
+                for (let i = 1; i < validFilesData.length; i++) {
+                    const currentFileData = validFilesData[i];
+                    const currentSelectedColumns = validSelectedColumns[i];
+
+                    currentFileData.data.forEach((currentRow, currentRowIndex) => {
+                        const currentRowMatchKey = currentSelectedColumns.map(col => getValueForComparison(currentRow[currentFileData.headers.indexOf(col)])).join('|||');
+                        if (matchKey === currentRowMatchKey) {
+                            hasMatchInAnyOther = true;
+                             currentRowIndices[i] = currentRowIndex; // Store matching index for this file
+                        }
+                    });
+                }
+
+                if (hasMatchInAnyOther) {
+                    const record = {};
+                    // Include data from all files that had a match for this row from the first file
+                    for (let j = 0; j < validFilesData.length; j++) {
+                         const fileDataToInclude = validFilesData[j];
+                         const rowIndexToInclude = currentRowIndices[j]; // Use stored index
+
+                         if (rowIndexToInclude !== undefined && fileDataToInclude && fileDataToInclude.data[rowIndexToInclude]) {
+                             fileDataToInclude.headers.forEach((header, headerIndex) => {
+                                 record[`File${j + 1} - ${header}`] = fileDataToInclude.data[rowIndexToInclude][headerIndex];
+                             });
+                         } else if (j === 0 && rowIndexToInclude !== undefined && fileDataToInclude && fileDataToInclude.data[rowIndexToInclude]) {
+                             // Always include the row from the first file if it was processed
+                              fileDataToInclude.headers.forEach((header, headerIndex) => {
+                                 record[`File${j + 1} - ${header}`] = fileDataToInclude.data[rowIndexToInclude][headerIndex];
+                             });
+                         } else {
+                             // Include empty cells for files that didn't have a match for this key
+                             if (validFilesData[j]) { // Check if the file exists
+                                 validFilesData[j].headers.forEach(header => {
+                                     record[`File${j + 1} - ${header}`] = '';
+                                 });
+                             }
+                         }
+                    }
+                    matchedRecords.push(record);
+                     processedFirstFileRows.add(rowIndex); // Mark this row from the first file as processed
+                }
+            });
+
+             // Now, find rows in other files that didn't match anything in the first file
+             for (let i = 1; i < validFilesData.length; i++) {
+                const currentFileData = validFilesData[i];
+                const currentSelectedColumns = validSelectedColumns[i];
+                const firstSelectedColumns = validSelectedColumns[0]; // Selected columns from the first file
+
+                currentFileData.data.forEach((row, rowIndex) => {
+                    const matchKey = currentSelectedColumns.map(col => getValueForComparison(row[currentFileData.headers.indexOf(col)])).join('|||');
+                    let hasMatchInFirst = false;
+
+                    if (firstFileData) {
+                        firstFileData.data.forEach(firstRow => {
+                            const firstRowMatchKey = firstSelectedColumns.map(col => getValueForComparison(firstRow[firstFileData.headers.indexOf(col)])).join('|||');
+                            if (matchKey === firstRowMatchKey) {
+                                hasMatchInFirst = true;
+                            }
+                        });
+                    }
+
+                    if (!hasMatchInFirst) {
+                         // Check if this row from the current file has a match in any other file (excluding the first)
+                         let hasMatchInAnyOtherBesidesFirst = false;
+                         for (let j = 1; j < validFilesData.length; j++) {
+                             if (i === j) continue; // Don't compare a file to itself
+                             const otherFileData = validFilesData[j];
+                             const otherSelectedColumns = validSelectedColumns[j];
+                             otherFileData.data.forEach(otherRow => {
+                                 const otherRowMatchKey = otherSelectedColumns.map(col => getValueForComparison(otherRow[otherSelectedColumns.indexOf(col)])).join('|||');
+                                 if (matchKey === otherRowMatchKey) {
+                                     hasMatchInAnyOtherBesidesFirst = true;
+                                 }
+                             });
+                             if (hasMatchInAnyOtherBesidesFirst) break;
+                         }
+
+                         if (hasMatchInAnyOtherBesidesFirst) {
+                             const record = {};
+                             // Include data from the current file and any others that match it (excluding the first)
+                             for (let j = 0; j < validFilesData.length; j++) {
+                                 const fileDataToInclude = validFilesData[j];
+                                  let rowIndexToInclude = -1; // Placeholder for index
+
+                                  if (j === i) {
+                                       rowIndexToInclude = rowIndex; // The current row in the current file
+                                  } else if (validFilesData[j]) { // Check if file exists
+                                      const selectedColsToConsider = validSelectedColumns[j];
+                                      validFilesData[j].data.forEach((otherRow, otherRowIndex) => {
+                                          const otherRowMatchKey = selectedColsToConsider.map(col => getValueForComparison(otherRow[selectedColsToConsider.indexOf(col)])).join('|||');
+                                          if (matchKey === otherRowMatchKey) {
+                                               rowIndexToInclude = otherRowIndex;
+                                          }
+                                      });
+                                  }
+
+
+                                  if (rowIndexToInclude !== -1 && fileDataToInclude && fileDataToInclude.data[rowIndexToInclude]) {
+                                      fileDataToInclude.headers.forEach((header, headerIndex) => {
+                                          record[`File${j + 1} - ${header}`] = fileDataToInclude.data[rowIndexToInclude][headerIndex];
+                                      });
+                                  } else {
+                                       // Include empty cells for files that didn't have a match for this key
+                                       if (validFilesData[j]) { // Check if the file exists
+                                           validFilesData[j].headers.forEach(header => {
+                                               record[`File${j + 1} - ${header}`] = '';
+                                           });
+                                       }
+                                  }
+                              }
+                             matchedRecords.push(record);
+                         }
+                    }
+                });
+             }
+
+
+            return matchedRecords;
+        }
+
+
+         function findNonMatchingRows() {
+            if (!filesData.some(data => data !== null)) {
+                alert('Please upload at least one file.');
+                return;
+            }
+
+            const selectedColumns = getSelectedColumns();
+            if (selectedColumns.some(cols => cols.length > 4)) {
+                alert('You can select a maximum of 4 columns per file for matching.');
+                return;
+            }
+
+            loadingIndicator.style.display = 'block';
+            setTimeout(() => {
+                const nonMatchingRows = findNonMatchingRowsLogic(filesData, selectedColumns);
+                displayMatchingRows(nonMatchingRows); // Reuse display function
+                currentOutputIsFuzzy = false; // Not fuzzy output
+                loadingIndicator.style.display = 'none';
+            }, 100); // Simulate processing time
+        }
+
+        function findNonMatchingRowsLogic(data, selectedColumns) {
+             if (data.every(file => file === null)) {
+                return [];
+            }
+
+            const validFilesData = data.filter(file => file !== null);
+            const validSelectedColumns = selectedColumns.filter((_, index) => data[index] !== null);
+
+            if (validFilesData.length <= 1) {
+                // If only one or zero files, all rows in the first file are non-matching (relative to other files)
+                if (validFilesData.length === 1) {
+                     return validFilesData[0].data.map((_, index) => {
+                        const record = {};
+                        validFilesData[0].headers.forEach((header, headerIndex) => {
+                            record[`File1 - ${header}`] = validFilesData[0].data[index][headerIndex];
+                        });
+                        return record;
+                    });
+                }
+                return [];
+            }
+
+            const nonMatchingRecords = [];
+            const firstFileData = validFilesData[0];
+            const firstSelectedColumns = validSelectedColumns[0];
+
+            firstFileData.data.forEach((row, rowIndex) => {
+                const matchKey = firstSelectedColumns.map(col => getValueForComparison(row[firstFileData.headers.indexOf(col)])).join('|||');
+                let hasMatchInAnyOther = false;
+
+                for (let i = 1; i < validFilesData.length; i++) {
+                    const currentFileData = validFilesData[i];
+                    const currentSelectedColumns = validSelectedColumns[i];
+
+                    // Check if any row in the current file matches the key
+                    if (currentFileData.data.some(currentRow => {
+                         const currentRowMatchKey = currentSelectedColumns.map(col => getValueForComparison(currentRow[currentFileData.headers.indexOf(col)])).join('|||');
+                         return matchKey === currentRowMatchKey;
+                    })) {
+                        hasMatchInAnyOther = true;
+                        break; // Found a match in at least one other file, so this row is NOT non-matching
+                    }
+                }
+
+                if (!hasMatchInAnyOther) {
+                    // If no match was found in any other file, this row from the first file is non-matching
+                    const record = {};
+                    // Only include data from the first file for non-matching rows
+                    if (firstFileData) {
+                         firstFileData.headers.forEach((header, headerIndex) => {
+                             record[`File1 - ${header}`] = firstFileData.data[rowIndex][headerIndex];
+                         });
+                         // Include empty cells for other files to maintain table structure
+                         for(let i = 1; i < filesData.length; i++) {
+                              if (filesData[i]) { // Check if the file slot is used
+                                  filesData[i].headers.forEach(header => {
+                                        record[`File${i + 1} - ${header}`] = '';
+                                  });
+                              }
+                         }
+                    }
+                    nonMatchingRecords.push(record);
+                }
+            });
+
+            return nonMatchingRecords;
+        }
+
+         // Levenshtein Distance function (a common implementation)
+        function levenshteinDistance(s1, s2) {
+            s1 = s1.toLowerCase();
+            s2 = s2.toLowerCase();
+            const costs = [];
+            for (let i = 0; i <= s1.length; i++) {
+                let lastValue = i;
+                for (let j = 0; j <= s2.length; j++) {
+                    if (i === 0) {
+                        costs[j] = j;
+                    } else if (j > 0) {
+                        let newValue = costs[j - 1];
+                        if (s1[i - 1] !== s2[j - 1]) {
+                            newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                        }
+                        costs[j - 1] = lastValue;
+                        lastValue = newValue;
+                    }
+                }
+                if (i > 0) costs[s2.length] = lastValue;
+            }
+            return costs[s2.length];
+        }
+
+         // Function to find fuzzy matching pairs
+        function findFuzzyMatchingPairs(data, selectedColumns, threshold = 0.8) { // Added default threshold
+            const fuzzyMatches = [];
+            const validFilesData = data.filter(file => file !== null);
+            const validSelectedColumns = selectedColumns.filter((_, index) => data[index] !== null);
+
+            if (validFilesData.length < 2) {
+                return []; // Need at least two files to find fuzzy matches between them
+            }
+
+            // Iterate through pairs of files
+            for (let i = 0; i < validFilesData.length; i++) {
+                for (let j = i + 1; j < validFilesData.length; j++) {
+                    const file1Data = validFilesData[i];
+                    const file2Data = validFilesData[j];
+                    const file1SelectedCols = validSelectedColumns[i];
+                    const file2SelectedCols = validSelectedColumns[j];
+
+                    // Ensure both files have selected columns for comparison and the same number of columns
+                    if (file1SelectedCols.length === 0 || file2SelectedCols.length === 0 || file1SelectedCols.length !== file2SelectedCols.length) {
+                         console.warn(`Skipping fuzzy match between File ${i + 1} and File ${j + 1}: Column selection mismatch.`);
+                         continue;
+                    }
+
+                    // Iterate through rows of the first file in the pair
+                    file1Data.data.forEach((row1, rowIndex1) => {
+                         // Iterate through rows of the second file in the pair
+                        file2Data.data.forEach((row2, rowIndex2) => {
+                            let allSelectedColsFuzzyMatch = true;
+                            const fuzzyMatchedValues = {}; // To store which columns had fuzzy matches
+
+                            // Compare values in selected columns
+                            for (let k = 0; k < file1SelectedCols.length; k++) {
+                                const col1Name = file1SelectedCols[k];
+                                const col2Name = file2SelectedCols[k];
+
+                                const value1 = row1[file1Data.headers.indexOf(col1Name)] || '';
+                                const value2 = row2[file2Data.headers.indexOf(col2Name)] || '';
+
+                                // Apply normalization if checkbox is checked
+                                const compareValue1 = getValueForComparison(value1);
+                                const compareValue2 = getValueForComparison(value2);
+
+                                 // Calculate similarity (1 - normalized Levenshtein distance)
+                                 const distance = levenshteinDistance(compareValue1, compareValue2);
+                                 const maxLen = Math.max(compareValue1.length, compareValue2.length);
+                                 const similarity = maxLen === 0 ? 1 : (maxLen - distance) / maxLen;
+
+
+                                if (similarity < threshold) {
+                                    allSelectedColsFuzzyMatch = false;
+                                    break; // No fuzzy match for this set of columns
+                                } else {
+                                     fuzzyMatchedValues[`File${i + 1} - ${file1Data.name} - ${col1Name}`] = value1; // Store original values
+                                     fuzzyMatchedValues[`File${j + 1} - ${file2Data.name} - ${col2Name}`] = value2; // Store original values
+                                }
+                            }
+
+                            if (allSelectedColsFuzzyMatch) {
+                                fuzzyMatches.push({
+                                    file1Name: file1Data.name,
+                                    file1Number: i + 1,
+                                    row1Index: rowIndex1 + 2, // +1 for 0-based index, +1 for header row
+                                    file2Name: file2Data.name,
+                                    file2Number: j + 1,
+                                    row2Index: rowIndex2 + 2,
+                                    matchedColumns: fuzzyMatchedValues // Store the values that matched
+                                });
+                            }
+                        });
+                    });
+                }
+            }
+
+            return fuzzyMatches;
+        }
+
+        // Function to display fuzzy matches as a table (like exact matches)
+        function displayFuzzyMatchesAsTable(fuzzyMatches) {
+            outputTableBody.innerHTML = '';
+            outputTableBottomBody.innerHTML = '';
+            const headerRow = document.querySelector('#output-table thead tr');
+            const headerRowBottom = document.querySelector('#output-table-bottom thead tr');
+            while (headerRow.cells.length > 1) headerRow.deleteCell(1);
+            while (headerRowBottom.cells.length > 1) headerRowBottom.deleteCell(1);
+
+            // Determine all headers from all uploaded files (like exact match)
+            let outputHeaders = [];
+            filesData.forEach((file, idx) => {
+                if (file && file.headers) {
+                    file.headers.forEach(header => {
+                        outputHeaders.push(`File${idx + 1} - ${header}`);
+                    });
+                }
+            });
+
+            // Add headers to table
+            outputHeaders.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+                const th2 = document.createElement('th');
+                th2.textContent = header;
+                headerRowBottom.appendChild(th2);
+            });
+
+            // If no matches, show message
+            if (!fuzzyMatches || fuzzyMatches.length === 0) {
+                const row = outputTableBody.insertRow();
+                const cell = row.insertCell();
+                cell.colSpan = outputHeaders.length + 1;
+                cell.textContent = 'No possible fuzzy matches found based on the selected columns and threshold.';
+                const row2 = outputTableBottomBody.insertRow();
+                const cell2 = row2.insertCell();
+                cell2.colSpan = outputHeaders.length + 1;
+                cell2.textContent = 'No possible fuzzy matches found based on the selected columns and threshold.';
+                outputTableContainerTop.style.overflowX = 'hidden';
+                outputTableContainerBottom.style.overflowX = 'hidden';
+                outputTableContainerBottom2.style.overflowX = 'hidden';
+                currentOutputData = [];
+                currentOutputHeaders = outputHeaders;
+                fuzzyMatchesDataForDownload = [];
+                currentOutputIsFuzzy = true;
+                updateDownloadOptions(false); // Use normal download options
+                return;
+            }
+
+            // Build table rows for each fuzzy match
+            let tableRows = [];
+            fuzzyMatches.forEach((match, idx) => {
+                // Prepare a row with all columns from all files
+                let rowObj = {};
+                // Fill with empty strings first
+                outputHeaders.forEach(h => rowObj[h] = '');
+
+                // Fill in data for file1
+                const file1Idx = match.file1Number - 1;
+                if (filesData[file1Idx]) {
+                    filesData[file1Idx].headers.forEach((header, hIdx) => {
+                        rowObj[`File${file1Idx + 1} - ${header}`] = filesData[file1Idx].data[match.row1Index - 2][hIdx];
+                    });
+                }
+                // Fill in data for file2
+                const file2Idx = match.file2Number - 1;
+                if (filesData[file2Idx]) {
+                    filesData[file2Idx].headers.forEach((header, hIdx) => {
+                        rowObj[`File${file2Idx + 1} - ${header}`] = filesData[file2Idx].data[match.row2Index - 2][hIdx];
+                    });
+                }
+                tableRows.push(rowObj);
+            });
+
+            // Normal order for top table
+            tableRows.forEach((rowObj, idx) => {
+                const row = outputTableBody.insertRow();
+                const rowNumberCell = row.insertCell();
+                rowNumberCell.textContent = idx + 1;
+                rowNumberCell.classList.add('row-number-cell');
+                outputHeaders.forEach(header => {
+                    const cell = row.insertCell();
+                    cell.textContent = rowObj[header] !== undefined ? rowObj[header] : '';
+                    const fileMatch = header.match(/File(\d+)/);
+                    if (fileMatch) cell.classList.add(`file${fileMatch[1]}-cell`);
+                });
+            });
+
+            // Show only the last N rows in the bottom table
+            const N = 20;
+            const startIdx = Math.max(0, tableRows.length - N);
+            for (let i = startIdx; i < tableRows.length; i++) {
+                const rowObj = tableRows[i];
+                const row = outputTableBottomBody.insertRow();
+                const rowNumberCell = row.insertCell();
+                rowNumberCell.textContent = i + 1;
+                rowNumberCell.classList.add('row-number-cell');
+                outputHeaders.forEach(header => {
+                    const cell = row.insertCell();
+                    cell.textContent = rowObj[header] !== undefined ? rowObj[header] : '';
+                    const fileMatch = header.match(/File(\d+)/);
+                    if (fileMatch) cell.classList.add(`file${fileMatch[1]}-cell`);
+                });
+            }
+
+            // Set current output data and headers for download
+            currentOutputData = tableRows;
+            currentOutputHeaders = outputHeaders;
+            currentOutputIsFuzzy = true;
+            updateDownloadOptions(false); // Use normal download options
+
+            // Scrollbar logic (same as exact match)
+            outputTableContainerTop.innerHTML = '';
+            if (outputTableBody.offsetWidth > outputTableContainerBottom.clientWidth) {
+                const dummyDiv = document.createElement('div');
+                dummyDiv.style.width = outputTableBody.offsetWidth + 'px';
+                dummyDiv.style.height = '1px';
+                outputTableContainerTop.appendChild(dummyDiv);
+                outputTableContainerTop.style.overflowX = 'auto';
+            } else {
+                outputTableContainerTop.style.overflowX = 'hidden';
+            }
+            outputTableContainerBottom.style.overflowX = 'auto';
+            outputTableContainerBottom.scrollTop = 0;
+
+            // Scroll bottom table to bottom
+            setTimeout(() => {
+                outputTableContainerBottom2.scrollTop = outputTableContainerBottom2.scrollHeight;
+            }, 0);
+        }
+
+        // Re-use existing display function for exact/any matches
+        function displayMatchingRows(matchedRows) {
+            outputTableBody.innerHTML = ''; // Clear previous output
+            outputTableBottomBody.innerHTML = '';
+            const headerRow = document.querySelector('#output-table thead tr');
+            const headerRowBottom = document.querySelector('#output-table-bottom thead tr');
+            while (headerRow.cells.length > 1) { // Keep the first '#' cell
+                headerRow.deleteCell(1);
+            }
+            while (headerRowBottom.cells.length > 1) headerRowBottom.deleteCell(1);
+
+            if (matchedRows.length === 0) {
+                const row = outputTableBody.insertRow();
+                const cell = row.insertCell();
+                cell.colSpan = allColumnHeaders.length * filesData.length + 1; // Approx colspan
+                cell.textContent = 'No matching records found.';
+                const row2 = outputTableBottomBody.insertRow();
+                const cell2 = row2.insertCell();
+                cell2.colSpan = allColumnHeaders.length * filesData.length + 1; // Approx colspan
+                cell2.textContent = 'No matching records found.';
+                outputTableContainerTop.style.overflowX = 'hidden';
+                outputTableContainerBottom.style.overflowX = 'hidden';
+                outputTableContainerBottom2.style.overflowX = 'hidden';
+                currentOutputData = [];
+                currentOutputHeaders = [];
+                currentOutputIsFuzzy = false;
+                updateDownloadOptions();
+                return;
+            }
+
+            // Determine all unique headers from all files involved in the match
+            const outputHeaders = new Set();
+            matchedRows.forEach(row => {
+                Object.keys(row).forEach(header => outputHeaders.add(header));
+            });
+
+            currentOutputHeaders = Array.from(outputHeaders).sort((a, b) => {
+                // Custom sort to keep file 1 columns first, then file 2, etc.
+                const getFileNum = (h) => parseInt(h.match(/File(\d+)/)?.[1] || 999);
+                const fileNumA = getFileNum(a);
+                const fileNumB = getFileNum(b);
+
+                if (fileNumA !== fileNumB) {
+                    return fileNumA - fileNumB;
+                }
+                return a.localeCompare(b);
+            });
+
+            currentOutputHeaders.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+                const th2 = document.createElement('th');
+                th2.textContent = header;
+                headerRowBottom.appendChild(th2);
+            });
+
+            matchedRows.forEach((rowData, index) => {
+                const row = outputTableBody.insertRow();
+                const rowNumberCell = row.insertCell();
+                rowNumberCell.textContent = index + 1;
+                rowNumberCell.classList.add('row-number-cell'); // Add a class for potential styling if needed
+
+                currentOutputHeaders.forEach(header => {
+                    const cell = row.insertCell();
+                    cell.textContent = rowData[header] !== undefined ? rowData[header] : '';
+
+                    // Add file-specific styling
+                    const fileMatch = header.match(/File(\d+)/);
+                    if (fileMatch) {
+                        cell.classList.add(`file${fileMatch[1]}-cell`);
+                    }
+                });
+            });
+
+            // Set current output data and headers for download
+            currentOutputData = matchedRows;
+            currentOutputIsFuzzy = false; // Not fuzzy output
+            updateDownloadOptions();
+
+            // Create a mirrored scrollbar for the top if needed
+            outputTableContainerTop.innerHTML = '';
+            if (outputTableBody.offsetWidth > outputTableContainerBottom.clientWidth) {
+                const dummyDiv = document.createElement('div');
+                dummyDiv.style.width = outputTableBody.offsetWidth + 'px';
+                dummyDiv.style.height = '1px'; // Make it visible only for scrolling
+                outputTableContainerTop.appendChild(dummyDiv);
+                outputTableContainerTop.style.overflowX = 'auto'; // Enable horizontal scroll on top
+            } else {
+                 outputTableContainerTop.style.overflowX = 'hidden'; // Hide horizontal scroll if not needed
+            }
+             outputTableContainerBottom.style.overflowX = 'auto'; // Always ensure bottom scroll is auto
+             outputTableContainerBottom.scrollTop = 0; // Reset scroll position
+        }
+
+
+        // Update download options based on current output type
+        function updateDownloadOptions(isFuzzy = false) {
+            downloadOptionsDiv.innerHTML = `
+                <label>Select columns to include in download:</label><br>
+                <input type="checkbox" id="select-all-columns" onchange="selectAllDownloadColumns(this.checked)">
+                <label for="select-all-columns">Select All</label><br>
+                <input type="checkbox" id="unselect-all-columns" onchange="unselectAllDownloadColumns(this.checked)">
+                <label for="unselect-all-columns">Unselect All</label><br>
+            `;
+
+            if (isFuzzy) {
+                // For fuzzy matches, provide simplified download options
+                const commonFuzzyHeaders = ['File 1 Name', 'File 1 Row', 'File 2 Name', 'File 2 Row', 'Matched Column Details'];
+                commonFuzzyHeaders.forEach(header => {
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = `download-col-${header.replace(/[^a-zA-Z0-9]/g, '')}`;
+                    checkbox.value = header;
+                    checkbox.checked = true; // Default to selected
+                    const label = document.createElement('label');
+                    label.setAttribute('for', `download-col-${header.replace(/[^a-zA-Z0-9]/g, '')}`);
+                    label.textContent = header;
+                    downloadOptionsDiv.appendChild(checkbox);
+                    downloadOptionsDiv.appendChild(label);
+                    downloadOptionsDiv.appendChild(document.createElement('br'));
+                });
+            } else {
+                // For exact/any matches, use the actual table headers
+                currentOutputHeaders.forEach(header => {
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = `download-col-${header.replace(/[^a-zA-Z0-9]/g, '')}`;
+                    checkbox.value = header;
+                    checkbox.checked = true; // Default to selected
+                    const label = document.createElement('label');
+                    label.setAttribute('for', `download-col-${header.replace(/[^a-zA-Z0-9]/g, '')}`);
+                    label.textContent = header;
+                    downloadOptionsDiv.appendChild(checkbox);
+                    downloadOptionsDiv.appendChild(label);
+                    downloadOptionsDiv.appendChild(document.createElement('br'));
+                });
+            }
+        }
+
+        function selectAllDownloadColumns(checked) {
+            const checkboxes = downloadOptionsDiv.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                if (checkbox.id !== 'select-all-columns' && checkbox.id !== 'unselect-all-columns') {
+                    checkbox.checked = checked;
+                }
+            });
+            document.getElementById('unselect-all-columns').checked = !checked;
+        }
+
+        function unselectAllDownloadColumns(checked) {
+            const checkboxes = downloadOptionsDiv.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                if (checkbox.id !== 'select-all-columns' && checkbox.id !== 'unselect-all-columns') {
+                    checkbox.checked = !checked;
+                }
+            });
+            document.getElementById('select-all-columns').checked = !checked;
+        }
+
+
+        function downloadOutput() {
+            let csvContent = '';
+            let selectedDownloadHeaders = [];
+
+            if (currentOutputIsFuzzy) {
+                // Handle fuzzy match download
+                const downloadCheckboxes = downloadOptionsDiv.querySelectorAll('input[type="checkbox"]:checked');
+                downloadCheckboxes.forEach(checkbox => {
+                    if (checkbox.id !== 'select-all-columns' && checkbox.id !== 'unselect-all-columns') {
+                        selectedDownloadHeaders.push(checkbox.value);
+                    }
+                });
+
+                if (selectedDownloadHeaders.length === 0) {
+                    alert('Please select at least one column to download.');
+                    return;
+                }
+
+                csvContent += selectedDownloadHeaders.map(h => `"${h}"`).join(',') + '\n';
+
+                fuzzyMatchesDataForDownload.forEach(match => {
+                    let rowData = [];
+                    selectedDownloadHeaders.forEach(header => {
+                        switch (header) {
+                            case 'File 1 Name':
+                                rowData.push(`"${match.file1Name}"`);
+                                break;
+                            case 'File 1 Row':
+                                rowData.push(`"${match.row1Index}"`);
+                                break;
+                            case 'File 2 Name':
+                                rowData.push(`"${match.file2Name}"`);
+                                break;
+                            case 'File 2 Row':
+                                rowData.push(`"${match.row2Index}"`);
+                                break;
+                            case 'Matched Column Details':
+                                let details = [];
+                                Object.keys(match.matchedColumns).forEach(colKey => {
+                                    details.push(`${colKey.split(' - ')[2]}: ${match.matchedColumns[colKey]}`);
+                                });
+                                rowData.push(`"${details.join('; ')}"`);
+                                break;
+                            default:
+                                rowData.push('');
+                        }
+                    });
+                    csvContent += rowData.join(',') + '\n';
+                });
+
+            } else {
+                // Handle exact/any match download (existing logic)
+                const downloadCheckboxes = downloadOptionsDiv.querySelectorAll('input[type="checkbox"]:checked');
+                downloadCheckboxes.forEach(checkbox => {
+                    if (checkbox.id !== 'select-all-columns' && checkbox.id !== 'unselect-all-columns') {
+                        selectedDownloadHeaders.push(checkbox.value);
+                    }
+                });
+
+                if (selectedDownloadHeaders.length === 0) {
+                    alert('Please select at least one column to download.');
+                    return;
+                }
+
+                csvContent += selectedDownloadHeaders.map(h => `"${h}"`).join(',') + '\n';
+
+                currentOutputData.forEach(row => {
+                    const rowValues = selectedDownloadHeaders.map(header => {
+                        const value = row[header];
+                        return value !== undefined ? `"${String(value).replace(/"/g, '""')}"` : '';
+                    });
+                    csvContent += rowValues.join(',') + '\n';
+                });
+            }
+
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) { // Feature detection
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'matched_data.csv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                alert('Your browser does not support downloading files directly. Please copy the content manually.');
+            }
+        }
+
+        // Add event listener to the new fuzzy match button
+        showFuzzyMatchesButton.onclick = function() {
+            // Set a threshold for fuzzy matching (e.g., 0.8 means 80% similarity)
+            const fuzzyMatchThreshold = 0.8;
+            const selectedColumns = getSelectedColumns();
+
+            // Check if at least two files have selected columns and the same number of columns
+            const validFilesWithSelectedCols = filesData.filter((file, index) => file !== null && selectedColumns[index].length > 0);
+            if (validFilesWithSelectedCols.length < 2) {
+                 alert('Please upload and select matching columns in at least two files for fuzzy matching.');
+                 return;
+            }
+             const firstSelectedColCount = selectedColumns[filesData.indexOf(validFilesWithSelectedCols[0])].length;
+             if (validFilesWithSelectedCols.some((file, index) => selectedColumns[filesData.indexOf(file)].length !== firstSelectedColCount)) {
+                  alert('For fuzzy matching, please select the same number of columns in the files you want to compare.');
+                 return;
+             }
+
+
+            loadingIndicator.style.display = 'block';
+            setTimeout(() => {
+                 const fuzzyMatches = findFuzzyMatchingPairs(filesData, selectedColumns, fuzzyMatchThreshold);
+                displayFuzzyMatchesAsTable(fuzzyMatches);
+                loadingIndicator.style.display = 'none';
+            }, 100);
+        };
+
+        // Sync scroll between top and bottom containers (for table view only)
+        outputTableContainerBottom.addEventListener('scroll', () => {
+            outputTableContainerTop.scrollLeft = outputTableContainerBottom.scrollLeft;
+        });
+        outputTableContainerTop.addEventListener('scroll', () => {
+            outputTableContainerBottom.scrollLeft = outputTableContainerTop.scrollLeft;
+        });
+
+    </script>
+</body>
+</html>
