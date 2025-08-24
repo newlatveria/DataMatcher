@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-File Data Matcher</title>
+    <!-- Include Tailwind CSS via CDN for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            @apply bg-gray-900 text-gray-200 p-8;
+        }
+        .container {
+            @apply max-w-7xl mx-auto space-y-8;
+        }
+        .section {
+            @apply bg-gray-800 p-6 rounded-lg shadow-xl;
+        }
+        .header {
+            @apply text-2xl font-bold mb-4 text-white;
+        }
+        .label {
+            @apply block text-sm font-medium text-gray-400 mb-1;
+        }
+        .input-group {
+            @apply flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4;
+        }
+        .button {
+            @apply py-2 px-4 rounded-lg font-semibold transition-all duration-300;
+        }
+        .button-primary {
+            @apply bg-indigo-600 text-white hover:bg-indigo-700;
+        }
+        .button-secondary {
+            @apply bg-gray-600 text-gray-200 hover:bg-gray-700;
+        }
+        .table-container {
+            @apply overflow-auto max-h-96 w-full rounded-lg border border-gray-700;
+        }
+        table {
+            @apply w-full text-sm text-left;
+        }
+        thead th {
+            @apply sticky top-0 bg-gray-700 px-4 py-2 font-medium text-gray-300 z-10;
+        }
+        tbody tr:nth-child(odd) {
+            @apply bg-gray-700;
+        }
+        tbody td {
+            @apply px-4 py-2 break-all;
+        }
+        /* Custom styles for the message box */
+        #message-box {
+            @apply fixed inset-0 flex items-center justify-center z-50 p-4;
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+        #message-box-content {
+            @apply bg-gray-800 p-6 rounded-lg shadow-2xl max-w-md w-full;
+            @apply border border-gray-700;
+        }
+        #message-box h3 {
+            @apply text-xl font-bold mb-2 text-white;
+        }
+        #message-box p {
+            @apply text-gray-300 mb-4;
+        }
+        #message-box button {
+            @apply bg-indigo-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-indigo-700 transition-colors;
+        }
+        .fuzzy-match-pair {
+            @apply border-b border-gray-600;
+        }
+        /* Progress bar styling */
+        .progress-bar {
+            @apply w-full h-2 rounded-full bg-gray-700 overflow-hidden;
+        }
+        .progress-bar-fill {
+            @apply h-full bg-green-500 transition-all duration-300 ease-in-out;
+            width: 0%;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 p-8">
+
+    <div class="container">
+        <!-- Application Title and Description -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-white mb-2">Multi-File Data Matcher</h1>
+            <p class="text-lg text-gray-400">Upload multiple CSV files, select columns, and find matching records.</p>
+        </header>
+
+        <!-- Instructions Section -->
+        <div class="section">
+            <h2 class="header">Instructions</h2>
+            <ol class="list-decimal list-inside text-gray-400 space-y-2">
+                <li><strong class="text-white">Upload Files:</strong> Click the "Add File" button to upload a CSV file.</li>
+                <li><strong class="text-white">Select Columns:</strong> For each uploaded file, use the dropdown menus to select the columns you wish to use for matching. You can select multiple columns.</li>
+                <li><strong class="text-white">Choose Match Type:</strong> Click either the "Exact Match" or "Fuzzy Match" button.</li>
+                <li><strong class="text-white">View Results:</strong> Matching rows from all selected files will be displayed in the table below.</li>
+            </ol>
+        </div>
+
+        <!-- File Upload Section -->
+        <div class="section">
+            <h2 class="header">Upload Files</h2>
+            <div id="file-upload-list" class="space-y-4">
+                <div class="input-group">
+                    <input type="file" id="file-upload-1" accept=".csv" class="file-input flex-grow">
+                    <div class="flex-grow">
+                        <label for="column-select-1" class="label">Select Columns for File 1</label>
+                        <select id="column-select-1" multiple class="column-select w-full bg-gray-700 border border-gray-600 rounded-lg p-2"></select>
+                    </div>
+                </div>
+            </div>
+            <button id="add-file-button" class="button button-secondary mt-4">Add Another File</button>
+        </div>
+
+        <!-- Matching Controls Section -->
+        <div class="section flex flex-col sm:flex-row items-center justify-between">
+            <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-4 sm:mb-0">
+                <label for="fuzzy-match-threshold" class="label text-gray-400">Fuzzy Match Threshold:</label>
+                <input type="number" id="fuzzy-match-threshold" value="0.8" step="0.01" min="0" max="1" class="w-24 bg-gray-700 border border-gray-600 rounded-lg p-2 text-center text-gray-200">
+            </div>
+            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                <button id="exact-match-button" class="button button-primary">Exact Match</button>
+                <button id="fuzzy-match-button" class="button button-primary">Fuzzy Match</button>
+                <button id="download-button" class="button button-secondary hidden">Download Results</button>
+                <button id="clear-button" class="button button-secondary">Clear All</button>
+            </div>
+        </div>
+
+        <!-- Output and Results Section -->
+        <div class="section">
+            <h2 class="header">Matching Results</h2>
+            <div id="loading-indicator" class="hidden text-center text-gray-400 mt-4">
+                <p>Processing files...</p>
+                <div class="progress-bar my-2">
+                    <div id="progress-bar-fill" class="progress-bar-fill"></div>
+                </div>
+            </div>
+            <div id="output-table-container-top" class="table-container mb-4"></div>
+            <div id="output-table-container-bottom" class="table-container"></div>
+            <div id="match-summary" class="text-gray-400 mt-4"></div>
+        </div>
+    </div>
+
+    <!-- Custom Message Box UI -->
+    <div id="message-box" class="hidden">
+        <div id="message-box-content">
+            <h3 id="message-box-title"></h3>
+            <p id="message-box-text"></p>
+            <div class="text-right">
+                <button id="message-box-close">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM element references
+        const fileUploadList = document.getElementById('file-upload-list');
+        const addFileButton = document.getElementById('add-file-button');
+        const exactMatchButton = document.getElementById('exact-match-button');
+        const fuzzyMatchButton = document.getElementById('fuzzy-match-button');
+        const downloadButton = document.getElementById('download-button');
+        const outputTableContainerTop = document.getElementById('output-table-container-top');
+        const outputTableContainerBottom = document.getElementById('output-table-container-bottom');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const progressBarFill = document.getElementById('progress-bar-fill');
+        const fuzzyMatchThresholdInput = document.getElementById('fuzzy-match-threshold');
+        const matchSummary = document.getElementById('match-summary');
+        const messageBox = document.getElementById('message-box');
+        const messageBoxTitle = document.getElementById('message-box-title');
+        const messageBoxText = document.getElementById('message-box-text');
+        const messageBoxCloseButton = document.getElementById('message-box-close');
+        const clearButton = document.getElementById('clear-button');
+
+        // Global state variables
+        let fileCounter = 1;
+        let filesData = [];
+        let selectedColumns = [];
+        let currentResults = {
+            matches: [],
+            matchType: null
+        };
+        let progressInterval = null;
+
+        /**
+         * Shows a custom message box with a title and message.
+         * @param {string} title The title of the message box.
+         * @param {string} message The message to display.
+         */
+        const showMessageBox = (title, message) => {
+            messageBoxTitle.textContent = title;
+            messageBoxText.textContent = message;
+            messageBox.classList.remove('hidden');
+        };
+
+        messageBoxCloseButton.addEventListener('click', () => {
+            messageBox.classList.add('hidden');
+        });
+
+        /**
+         * Normalizes a string for robust comparison by converting to lowercase,
+         * trimming whitespace, and replacing common non-printable characters.
+         * This function is crucial for ensuring "A B C" and " a b c" are treated the same.
+         * @param {string} str The string to normalize.
+         * @returns {string} The normalized string.
+         */
+        const normalizeForComparison = (str) => {
+            if (typeof str !== 'string') {
+                return '';
+            }
+            // Use a regular expression to replace various whitespace characters with a single space
+            // and then trim. This handles non-breaking spaces and other similar characters.
+            return str.toLowerCase().replace(/\s+/g, ' ').trim();
+        };
+
+        /**
+         * Calculates the Jaro-Winkler distance between two strings, used for fuzzy matching.
+         * @param {string} s1 The first string.
+         * @param {string} s2 The second string.
+         * @returns {number} The Jaro-Winkler distance (0 to 1).
+         */
+        const jaroWinklerDistance = (s1, s2) => {
+            const m = [];
+            const t = [];
+            const s1_len = s1.length;
+            const s2_len = s2.length;
+            if (s1_len === 0 || s2_len === 0) return 0;
+
+            const match_window = Math.floor(Math.max(s1_len, s2_len) / 2) - 1;
+
+            const s1_matches = new Array(s1_len).fill(false);
+            const s2_matches = new Array(s2_len).fill(false);
+
+            let matches = 0;
+            for (let i = 0; i < s1_len; i++) {
+                const start = Math.max(0, i - match_window);
+                const end = Math.min(i + match_window + 1, s2_len);
+                for (let j = start; j < end; j++) {
+                    if (!s2_matches[j] && s1[i] === s2[j]) {
+                        s1_matches[i] = true;
+                        s2_matches[j] = true;
+                        matches++;
+                        break;
+                    }
+                }
+            }
+
+            if (matches === 0) return 0;
+
+            let k = 0;
+            for (let i = 0; i < s1_len; i++) {
+                if (s1_matches[i]) {
+                    m.push(s1[i]);
+                }
+            }
+
+            for (let i = 0; i < s2_len; i++) {
+                if (s2_matches[i]) {
+                    t.push(s2[i]);
+                }
+            }
+
+            let transpositions = 0;
+            for (let i = 0; i < m.length; i++) {
+                if (m[i] !== t[i]) {
+                    transpositions++;
+                }
+            }
+            transpositions /= 2;
+
+            const jaro = (matches / s1_len + matches / s2_len + (matches - transpositions) / matches) / 3;
+
+            let l = 0;
+            while (l < Math.min(s1_len, s2_len) && s1[l] === s2[l] && l < 4) {
+                l++;
+            }
+
+            const p = 0.1;
+            return jaro + l * p * (1 - jaro);
+        };
+
+        /**
+         * Parses a CSV string into an array of objects.
+         * @param {string} csvText The CSV data as a string.
+         * @returns {Array<Object>} An array of objects, where each object is a row.
+         */
+        const parseCSV = (csvText) => {
+            const lines = csvText.trim().split('\n');
+            if (lines.length === 0) return [];
+            const headers = lines[0].split(',').map(header => header.trim());
+            const data = lines.slice(1).map(line => {
+                const values = line.split(',').map(value => value.trim());
+                const row = {};
+                headers.forEach((header, index) => {
+                    row[header] = values[index];
+                });
+                return row;
+            });
+            return data;
+        };
+
+        /**
+         * Creates a new file upload and column selection row in the UI.
+         */
+        const createFileUploadRow = () => {
+            fileCounter++;
+            const fileRow = document.createElement('div');
+            fileRow.className = 'input-group';
+            fileRow.innerHTML = `
+                <input type="file" id="file-upload-${fileCounter}" accept=".csv" class="file-input flex-grow">
+                <div class="flex-grow">
+                    <label for="column-select-${fileCounter}" class="label">Select Columns for File ${fileCounter}</label>
+                    <select id="column-select-${fileCounter}" multiple class="column-select w-full bg-gray-700 border border-gray-600 rounded-lg p-2"></select>
+                </div>
+            `;
+            fileUploadList.appendChild(fileRow);
+            setupFileEventListeners(fileCounter);
+        };
+
+        /**
+         * Sets up change event listeners for a new file input.
+         * @param {number} index The index of the file input.
+         */
+        const setupFileEventListeners = (index) => {
+            const fileInput = document.getElementById(`file-upload-${index}`);
+            const columnSelect = document.getElementById(`column-select-${index}`);
+            
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const csvText = e.target.result;
+                    filesData[index - 1] = {
+                        name: file.name,
+                        data: parseCSV(csvText)
+                    };
+                    updateColumnOptions(index, filesData[index - 1].data[0]);
+                };
+                reader.readAsText(file);
+            });
+
+            columnSelect.addEventListener('change', () => {
+                selectedColumns[index - 1] = Array.from(columnSelect.selectedOptions).map(option => option.value);
+            });
+        };
+
+        /**
+         * Populates the column selection dropdown with headers from the uploaded file.
+         * @param {number} index The index of the file.
+         * @param {Object} firstRow The first row of data (containing headers).
+         */
+        const updateColumnOptions = (index, firstRow) => {
+            const columnSelect = document.getElementById(`column-select-${index}`);
+            columnSelect.innerHTML = '';
+            if (firstRow) {
+                Object.keys(firstRow).forEach(key => {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = key;
+                    columnSelect.appendChild(option);
+                });
+            }
+        };
+
+        /**
+         * Displays the matching results in a table format.
+         * @param {Array<Object>} matches The array of matching objects to display.
+         * @param {string} matchType The type of match ('exact' or 'fuzzy').
+         */
+        const displayResultsAsTable = (matches, matchType) => {
+            if (!matches || matches.length === 0) {
+                outputTableContainerTop.innerHTML = '<p class="text-center text-gray-400">No matches found.</p>';
+                outputTableContainerBottom.innerHTML = '';
+                matchSummary.textContent = `Found 0 matching pairs.`;
+                downloadButton.classList.add('hidden');
+                return;
+            }
+
+            // Create a flat set of all selected columns for quick lookup
+            const allSelectedCols = new Set(selectedColumns.flat());
+            
+            let tableHTML = '';
+            
+            if (matchType === 'fuzzy') {
+                // For fuzzy matches, the input `matches` array is already a list of pairs.
+                const allHeaders = new Set();
+                matches.forEach(item => {
+                    Object.keys(item.row1.row).forEach(header => allHeaders.add(header));
+                    Object.keys(item.row2.row).forEach(header => allHeaders.add(header));
+                });
+                const sortedHeaders = Array.from(allHeaders).sort();
+                 tableHTML = `
+                    <table class="min-w-full">
+                        <thead>
+                            <tr>
+                                ${sortedHeaders.map(header => {
+                                    const isMatchedCol = allSelectedCols.has(header);
+                                    return `<th class="px-4 py-2 ${isMatchedCol ? 'text-cyan-400' : ''}">${header}</th>`;
+                                }).join('')}
+                                <th class="px-4 py-2">Source File</th>
+                                <th class="px-4 py-2 text-yellow-400">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${matches.map(pair => `
+                                <tr class="fuzzy-match-pair">
+                                    ${sortedHeaders.map(header => {
+                                        const value = pair.row1.row[header] !== undefined ? pair.row1.row[header] : 'N/A';
+                                        const isMatchedCol = allSelectedCols.has(header);
+                                        return `<td class="px-4 py-2 ${isMatchedCol ? 'text-cyan-400' : ''}">${value}</td>`;
+                                    }).join('')}
+                                    <td class="px-4 py-2 font-semibold text-indigo-400">${pair.row1.fileName}</td>
+                                    <td class="px-4 py-2 text-yellow-400" rowspan="2">${pair.score.toFixed(2)}</td>
+                                </tr>
+                                <tr class="fuzzy-match-pair">
+                                    ${sortedHeaders.map(header => {
+                                        const value = pair.row2.row[header] !== undefined ? pair.row2.row[header] : 'N/A';
+                                        const isMatchedCol = allSelectedCols.has(header);
+                                        return `<td class="px-4 py-2 ${isMatchedCol ? 'text-cyan-400' : ''}">${value}</td>`;
+                                    }).join('')}
+                                    <td class="px-4 py-2 font-semibold text-indigo-400">${pair.row2.fileName}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else { // 'exact' matchType
+                // Group exact matches by their key to display on a single line
+                const matchesMap = new Map();
+                matches.forEach(rowInfo => {
+                    const key = selectedColumns.flat().map(col => normalizeForComparison(rowInfo.originalRow[col])).join('|');
+                    if (!matchesMap.has(key)) {
+                        matchesMap.set(key, []);
+                    }
+                    matchesMap.get(key).push(rowInfo);
+                });
+
+                const allHeaders = new Set();
+                matchesMap.forEach(rows => {
+                    rows.forEach(rowInfo => {
+                        Object.keys(rowInfo.originalRow).forEach(header => {
+                            allHeaders.add(`${rowInfo.sourceFile}_${header}`);
+                        });
+                    });
+                });
+                const sortedHeaders = Array.from(allHeaders).sort();
+                
+                tableHTML = `
+                    <table class="min-w-full">
+                        <thead>
+                            <tr>
+                                ${sortedHeaders.map(header => `<th class="px-4 py-2">${header}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Array.from(matchesMap.values()).map(rows => {
+                                const rowData = {};
+                                rows.forEach(rowInfo => {
+                                    Object.keys(rowInfo.originalRow).forEach(header => {
+                                        rowData[`${rowInfo.sourceFile}_${header}`] = rowInfo.originalRow[header];
+                                    });
+                                });
+
+                                return `
+                                    <tr>
+                                        ${sortedHeaders.map(header => {
+                                            const value = rowData[header] !== undefined ? rowData[header] : 'N/A';
+                                            return `<td class="px-4 py-2">${value}</td>`;
+                                        }).join('')}
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+
+            outputTableContainerTop.innerHTML = tableHTML;
+            outputTableContainerBottom.innerHTML = tableHTML;
+            downloadButton.classList.remove('hidden');
+            matchSummary.textContent = `Found ${matches.length} matching rows.`;
+        };
+
+
+        /**
+         * Finds exact matching pairs across all selected files.
+         * @param {Array<Object>} filesData Array of file data objects.
+         * @param {Array<Array<string>>} selectedColumns Array of selected column arrays.
+         * @returns {Array<Object>} A flat array of matching rows, with source file info.
+         */
+        const findExactMatchingPairs = (filesData, selectedColumns) => {
+            const matches = new Map();
+            const validFiles = filesData.filter((file, index) => file && selectedColumns[index] && selectedColumns[index].length > 0);
+
+            if (validFiles.length < 2) {
+                showMessageBox('Matching Error', 'Please upload and select matching columns in at least two files.');
+                return [];
+            }
+
+            // First pass: Populate the map with all normalized keys and their associated rows
+            validFiles.forEach((file, fileIndex) => {
+                const fileSelectedCols = selectedColumns[filesData.indexOf(file)];
+                file.data.forEach((row) => {
+                    const key = fileSelectedCols.map(col => normalizeForComparison(row[col])).join('|');
+                    if (key) {
+                        if (!matches.has(key)) {
+                            matches.set(key, []);
+                        }
+                        matches.get(key).push({ originalRow: row, sourceFile: file.name });
+                    }
+                });
+            });
+
+            // Second pass: Filter for keys that have multiple rows and are from at least two different files
+            const finalMatches = [];
+            matches.forEach((rows, key) => {
+                const sourceFiles = new Set(rows.map(r => r.sourceFile));
+                if (sourceFiles.size > 1) {
+                    finalMatches.push(...rows);
+                }
+            });
+
+            return finalMatches;
+        };
+        
+        /**
+         * Finds fuzzy matching pairs across all selected files.
+         * @param {Array<Object>} filesData Array of file data objects.
+         * @param {Array<Array<string>>} selectedColumns Array of selected column arrays.
+         * @param {number} threshold The minimum Jaro-Winkler distance to be considered a match.
+         * @returns {Array<Object>} An array of matching pairs with their scores.
+         */
+        const findFuzzyMatchingPairs = (filesData, selectedColumns, threshold) => {
+            const allRows = [];
+            const finalMatches = [];
+            const validFiles = filesData.filter((file, index) => file && selectedColumns[index] && selectedColumns[index].length > 0);
+            
+            if (validFiles.length < 2) {
+                showMessageBox('Matching Error', 'Please upload and select matching columns in at least two files.');
+                return [];
+            }
+            
+            // Prepare a flattened array of all rows with their file and row index
+            validFiles.forEach((file, fileIndex) => {
+                const colNames = selectedColumns[filesData.indexOf(file)];
+                file.data.forEach((row, rowIndex) => {
+                    allRows.push({
+                        fileId: fileIndex,
+                        fileName: file.name,
+                        rowId: rowIndex,
+                        row,
+                        value: colNames.map(col => normalizeForComparison(row[col])).join(' ')
+                    });
+                });
+            });
+
+            // Compare every row against every other row to find matches
+            for (let i = 0; i < allRows.length; i++) {
+                for (let j = i + 1; j < allRows.length; j++) {
+                    const row1 = allRows[i];
+                    const row2 = allRows[j];
+                    
+                    // Only compare rows from different files
+                    if (row1.fileId !== row2.fileId) {
+                        const distance = jaroWinklerDistance(row1.value, row2.value);
+                        if (distance >= threshold) {
+                            finalMatches.push({
+                                row1: row1,
+                                row2: row2,
+                                score: distance
+                            });
+                        }
+                    }
+                }
+            }
+            
+            return finalMatches;
+        };
+
+        /**
+         * Converts the current results data into a CSV string.
+         * @param {Array<Object>} results The results data to convert.
+         * @param {string} matchType The type of match ('exact' or 'fuzzy').
+         * @returns {string} The CSV data.
+         */
+        const generateCSV = (results, matchType) => {
+            if (!results || results.length === 0) return '';
+            
+            let csvContent = '';
+            
+            if (matchType === 'fuzzy') {
+                // Fuzzy match CSV format: combines a pair of matches into a single row.
+                const allHeaders = new Set();
+                results.forEach(pair => {
+                    Object.keys(pair.row1.row).forEach(header => allHeaders.add(`${pair.row1.fileName}_${header}`));
+                    Object.keys(pair.row2.row).forEach(header => allHeaders.add(`${pair.row2.fileName}_${header}`));
+                });
+
+                const sortedHeaders = Array.from(allHeaders).sort();
+                csvContent += sortedHeaders.map(header => `"${header.replace(/"/g, '""')}"`).join(',') + ',Score\n';
+
+                results.forEach(pair => {
+                    const rowData = {};
+                    Object.keys(pair.row1.row).forEach(header => {
+                        rowData[`${pair.row1.fileName}_${header}`] = pair.row1.row[header];
+                    });
+                    Object.keys(pair.row2.row).forEach(header => {
+                        rowData[`${pair.row2.fileName}_${header}`] = pair.row2.row[header];
+                    });
+                    
+                    const rowValues = sortedHeaders.map(header => {
+                        const value = rowData[header] !== undefined ? rowData[header] : 'N/A';
+                        // Escape double quotes and enclose in double quotes
+                        return `"${value.replace(/"/g, '""')}"`;
+                    });
+
+                    csvContent += rowValues.join(',') + `,${pair.score.toFixed(2)}\n`;
+                });
+
+            } else { // 'exact'
+                // Exact match CSV format: combines all matches for a key into a single row.
+                const matchesMap = new Map();
+                results.forEach(rowInfo => {
+                    const key = selectedColumns.flat().map(col => normalizeForComparison(rowInfo.originalRow[col])).join('|');
+                    if (!matchesMap.has(key)) {
+                        matchesMap.set(key, []);
+                    }
+                    matchesMap.get(key).push(rowInfo);
+                });
+
+                const allHeaders = new Set();
+                matchesMap.forEach(rows => {
+                    rows.forEach(rowInfo => {
+                        Object.keys(rowInfo.originalRow).forEach(header => {
+                            allHeaders.add(`${rowInfo.sourceFile}_${header}`);
+                        });
+                    });
+                });
+                
+                const sortedHeaders = Array.from(allHeaders).sort();
+                csvContent += sortedHeaders.map(header => `"${header.replace(/"/g, '""')}"`).join(',') + '\n';
+                
+                matchesMap.forEach(rows => {
+                    const rowData = {};
+                    rows.forEach(rowInfo => {
+                        Object.keys(rowInfo.originalRow).forEach(header => {
+                            rowData[`${rowInfo.sourceFile}_${header}`] = rowInfo.originalRow[header];
+                        });
+                    });
+
+                    const rowValues = sortedHeaders.map(header => {
+                        const value = rowData[header] !== undefined ? rowData[header] : 'N/A';
+                        return `"${value.replace(/"/g, '""')}"`;
+                    });
+                    csvContent += rowValues.join(',') + '\n';
+                });
+            }
+
+            return csvContent;
+        };
+        
+        /**
+         * Clears all uploaded files and results from the UI and state.
+         */
+        const clearAll = () => {
+            // Clear global state
+            fileCounter = 1;
+            filesData = [];
+            selectedColumns = [];
+            currentResults = { matches: [], matchType: null };
+
+            // Clear UI elements
+            fileUploadList.innerHTML = '';
+            const initialRow = document.createElement('div');
+            initialRow.className = 'input-group';
+            initialRow.innerHTML = `
+                <input type="file" id="file-upload-1" accept=".csv" class="file-input flex-grow">
+                <div class="flex-grow">
+                    <label for="column-select-1" class="label">Select Columns for File 1</label>
+                    <select id="column-select-1" multiple class="column-select w-full bg-gray-700 border border-gray-600 rounded-lg p-2"></select>
+                </div>
+            `;
+            fileUploadList.appendChild(initialRow);
+            setupFileEventListeners(1);
+
+            outputTableContainerTop.innerHTML = '';
+            outputTableContainerBottom.innerHTML = '';
+            matchSummary.textContent = '';
+            downloadButton.classList.add('hidden');
+        };
+
+        // Event Listeners
+        addFileButton.addEventListener('click', createFileUploadRow);
+        setupFileEventListeners(1); // Setup the initial file row
+
+        exactMatchButton.addEventListener('click', () => {
+            loadingIndicator.classList.remove('hidden');
+            let progress = 0;
+            progressBarFill.style.width = '0%';
+            progressInterval = setInterval(() => {
+                progress += 10;
+                if (progress <= 90) {
+                    progressBarFill.style.width = `${progress}%`;
+                }
+            }, 50);
+
+            setTimeout(() => {
+                clearInterval(progressInterval);
+                const exactMatches = findExactMatchingPairs(filesData, selectedColumns);
+                currentResults = { matches: exactMatches, matchType: 'exact' };
+                displayResultsAsTable(currentResults.matches, currentResults.matchType);
+                progressBarFill.style.width = '100%';
+                setTimeout(() => {
+                    loadingIndicator.classList.add('hidden');
+                    progressBarFill.style.width = '0%';
+                }, 200);
+            }, 500);
+        });
+
+        fuzzyMatchButton.addEventListener('click', () => {
+            const fuzzyMatchThreshold = parseFloat(fuzzyMatchThresholdInput.value);
+            if (isNaN(fuzzyMatchThreshold) || fuzzyMatchThreshold < 0 || fuzzyMatchThreshold > 1) {
+                showMessageBox('Input Error', 'Please enter a valid fuzzy match threshold between 0 and 1.');
+                return;
+            }
+
+            loadingIndicator.classList.remove('hidden');
+            let progress = 0;
+            progressBarFill.style.width = '0%';
+            progressInterval = setInterval(() => {
+                progress += 10;
+                if (progress <= 90) {
+                    progressBarFill.style.width = `${progress}%`;
+                }
+            }, 50);
+
+            setTimeout(() => {
+                clearInterval(progressInterval);
+                const fuzzyMatches = findFuzzyMatchingPairs(filesData, selectedColumns, fuzzyMatchThreshold);
+                currentResults = { matches: fuzzyMatches, matchType: 'fuzzy' };
+                displayResultsAsTable(currentResults.matches, currentResults.matchType);
+                progressBarFill.style.width = '100%';
+                setTimeout(() => {
+                    loadingIndicator.classList.add('hidden');
+                    progressBarFill.style.width = '0%';
+                }, 200);
+            }, 500);
+        });
+
+        downloadButton.addEventListener('click', () => {
+            const csvData = generateCSV(currentResults.matches, currentResults.matchType);
+            if (csvData) {
+                const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                if (link.download !== undefined) {
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', 'matching_results.csv');
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            } else {
+                showMessageBox('Download Error', 'No data to download. Please perform a match first.');
+            }
+        });
+        
+        clearButton.addEventListener('click', clearAll);
+
+        // Sync scroll between top and bottom containers (for table view only)
+        outputTableContainerBottom.addEventListener('scroll', () => {
+            outputTableContainerTop.scrollLeft = outputTableContainerBottom.scrollLeft;
+        });
+        outputTableContainerTop.addEventListener('scroll', () => {
+            outputTableContainerBottom.scrollLeft = outputTableContainerTop.scrollLeft;
+        });
+
+    </script>
+</body>
+</html>
